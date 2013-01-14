@@ -3,21 +3,19 @@ require 'json'
 
 module Twitter
 
-  class TweetsReader
+  class Search
 
-    URL = 'http://search.twitter.com/search.json?'
+    URL = 'http://search.twitter.com/search.json?'.freeze
+    DEFAULTS = {:result_type => 'recent', :rpp => 100}.freeze
 
     def initialize(query)
-      @params = Hash.new
-      @params[:q] = query
-      @params[:result_type] = 'recent'
+      @params = DEFAULTS.merge({:q => query})
     end
 
     def find_recent
       tweets = Array.new
       loop {
-        url = request_url
-        puts "reading from #{url}"
+        url = next_request_url
         response = JSON.parse(open(url).read)
         break if no_tweets_in(response)
         udpate_query_params(response)
@@ -36,7 +34,7 @@ module Twitter
       @params[:max_id] = response["results"].last["id"].to_i - 1 unless response["results"].empty?
     end
 
-    def request_url
+    def next_request_url
       URL + URI.encode_www_form(@params)
     end
 
