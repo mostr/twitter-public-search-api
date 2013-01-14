@@ -8,21 +8,23 @@ module Twitter
   describe Search do
 
     before(:all) do
-      @url = Search::URL + 'q=code&result_type=recent&rpp=100'
       FakeWeb.allow_net_connect = false
       @fake_responses = prepare_fake_responses
+      @query = 'code'
+      @url = Search::URL + URI.encode_www_form(Search::DEFAULTS.merge({:q => @query}))
     end
 
     before(:each) do
       FakeWeb.clean_registry
-      @query = 'code'
     end
 
 
 
     it "should return array of tweets hashes from one page" do
-      FakeWeb.register_uri(:get, @url, :body => @fake_responses[:standard_response][:raw_content])
-      FakeWeb.register_uri(:get, "#{@url}&max_id=288373232690687999", :body => @fake_responses[:empty_results_response][:raw_content])
+      standard_response = @fake_responses[:standard_response]
+      empty_response = @fake_responses[:empty_results_response]
+      FakeWeb.register_uri(:get, @url, :body => standard_response[:raw_content])
+      FakeWeb.register_uri(:get, request_url({:q => @query, :max_id => standard_response[:next_max_id]}), :body => empty_response[:raw_content])
 
       reader = Search.new(@query)
       tweets = reader.find_recent
@@ -33,7 +35,8 @@ module Twitter
 
 
     it "should return empty array when no results returned on first page" do
-      FakeWeb.register_uri(:get, @url, :body => @fake_responses[:empty_results_response][:raw_content])
+      empty_response = @fake_responses[:empty_results_response]
+      FakeWeb.register_uri(:get, @url, :body => empty_response[:raw_content])
 
       reader = Search.new(@query)
       tweets = reader.find_recent
@@ -44,18 +47,23 @@ module Twitter
 
 
     it "should collect tweets from next page with correct max_id query param" do
-      FakeWeb.register_uri(:get, "#{@url}", :body => @fake_responses[:multi_paged_response_1][:raw_content])
-      FakeWeb.register_uri(:get, "#{@url}&max_id=288217277147533311", :body => @fake_responses[:multi_paged_response_2][:raw_content])
-      FakeWeb.register_uri(:get, "#{@url}&max_id=287941375293542400", :body => @fake_responses[:empty_results_response][:raw_content])
+      page_one_response = @fake_responses[:multi_paged_response_1]
+      page_two_response = @fake_responses[:multi_paged_response_2]
+      empty_response = @fake_responses[:empty_results_response]
+      FakeWeb.register_uri(:get, request_url({:q => @query}), :body => page_one_response[:raw_content])
+      FakeWeb.register_uri(:get, request_url({:q => @query, :max_id => page_one_response[:next_max_id]}), :body => page_two_response[:raw_content])
+      FakeWeb.register_uri(:get, request_url({:q => @query, :max_id => page_two_response[:next_max_id]}), :body => empty_response[:raw_content])
 
       reader = Search.new(@query)
       tweets = reader.find_recent
 
-      tweets_count = @fake_responses[:multi_paged_response_1][:tweets_no] + @fake_responses[:multi_paged_response_2][:tweets_no]
+      tweets_count = page_one_response[:tweets_no] + page_two_response[:tweets_no]
       tweets.size.should == tweets_count
     end
 
-
+    def request_url(options)
+      Search::URL + URI.encode_www_form(Search::DEFAULTS.merge(options))
+    end
 
     def prepare_fake_responses
       responses = {}
