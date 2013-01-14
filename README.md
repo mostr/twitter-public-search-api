@@ -1,5 +1,4 @@
-Twitter #code2012
+Twitter Public Search API
 ---
 
-Some code to play with #code2012 data on twitter.
-Work in progress, rather slow progress :)
+Tiny piece of code that goes thru Twitter public search API (until limit is reached or all results are found) and returns set of tweets found.
